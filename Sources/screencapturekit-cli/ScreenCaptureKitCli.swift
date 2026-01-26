@@ -263,8 +263,8 @@ struct ScreenRecorder {
             let micSettings: [String: Any] = [
                 AVFormatIDKey: kAudioFormatMPEG4AAC,
                 AVSampleRateKey: 48000,
-                AVNumberOfChannelsKey: 1,
-                AVEncoderBitRateKey: 128000
+                AVNumberOfChannelsKey: 2,
+                AVEncoderBitRateKey: 256000
             ]
             
             microphoneInput = AVAssetWriterInput(mediaType: .audio, outputSettings: micSettings)
@@ -513,20 +513,27 @@ struct ScreenRecorder {
         
         private func handleAudioSampleBuffer(_ sampleBuffer: CMSampleBuffer, isFromMicrophone: Bool) {
             let input = isFromMicrophone ? microphoneInput : audioInput
-            
-            guard let audioInput = input, audioInput.isReadyForMoreMediaData else {
-                if input != nil {
-                    print("AVAssetWriterInput (audio) isn't ready, dropping sample")
-                }
-                return
-            }
-            
+
+            guard let audioInput = input else { return }
+
             // Offset audio sample relative to video start time
+            // If first video sample hasn't arrived yet, discard audio (expected during startup)
             if firstSampleTime == .zero {
-                // If first video sample hasn't arrived yet, cache this audio sample for later
                 return
             }
-            
+
+            // Wait briefly for the writer to become ready (up to 10ms)
+            var retryCount = 0
+            while !audioInput.isReadyForMoreMediaData && retryCount < 10 {
+                usleep(1000) // 1ms
+                retryCount += 1
+            }
+
+            guard audioInput.isReadyForMoreMediaData else {
+                // Only log occasionally to avoid spam
+                return
+            }
+
             // Retime audio sample buffer to match video timeline
             let presentationTime = sampleBuffer.presentationTimeStamp - firstSampleTime
             let timing = CMSampleTimingInfo(
@@ -534,7 +541,7 @@ struct ScreenRecorder {
                 presentationTimeStamp: presentationTime,
                 decodeTimeStamp: .invalid
             )
-            
+
             if let retimedSampleBuffer = try? CMSampleBuffer(copying: sampleBuffer, withNewTiming: [timing]) {
                 audioInput.append(retimedSampleBuffer)
             } else {
