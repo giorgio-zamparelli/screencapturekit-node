@@ -117,6 +117,7 @@ export type { MicrophoneDevice };
  * @property {boolean} [enableHDR] - Enable HDR recording (on macOS 13.0+).
  * @property {boolean} [recordToFile] - Use the direct recording API (on macOS 14.0+).
  * @property {boolean} [audioOnly] - Record audio only, will convert to mp3 after recording.
+ * @property {string} [outputFilePath] - Custom output file path. If not specified, a temp file is created.
  */
 type RecordingOptions = {
   fps: number;
@@ -130,6 +131,7 @@ type RecordingOptions = {
   enableHDR?: boolean;
   recordToFile?: boolean;
   audioOnly?: boolean;
+  outputFilePath?: string;
 };
 
 export type { RecordingOptions };
@@ -215,6 +217,7 @@ export class ScreenCaptureKit {
    * @param {string} [options.videoCodec="h264"] - Video codec to use.
    * @param {boolean} [options.enableHDR=false] - Enable HDR recording.
    * @param {boolean} [options.recordToFile=false] - Use the direct recording API.
+   * @param {string} [options.outputFilePath] - Custom output file path. If not specified, a temp file is created.
    * @returns {Promise<void>} A promise that resolves when recording starts.
    * @throws {Error} If recording is already in progress or if the options are invalid.
    */
@@ -230,6 +233,7 @@ export class ScreenCaptureKit {
     enableHDR = false,
     recordToFile = false,
     audioOnly = false,
+    outputFilePath = undefined,
   }: Partial<RecordingOptions> = {}) {
     this.processId = getRandomId();
     // Stocke les options actuelles pour utilisation ultérieure
@@ -245,15 +249,16 @@ export class ScreenCaptureKit {
       enableHDR,
       recordToFile,
       audioOnly,
+      outputFilePath,
     };
-    
+
     return new Promise((resolve, reject) => {
       if (this.recorder !== undefined) {
         reject(new Error("Call `.stopRecording()` first"));
         return;
       }
 
-      this.videoPath = createTempFile({ extension: "mp4" });
+      this.videoPath = outputFilePath || createTempFile({ extension: "mp4" });
       
       console.log(this.videoPath);
       const recorderOptions: RecordingOptionsForScreenCaptureKit = {
