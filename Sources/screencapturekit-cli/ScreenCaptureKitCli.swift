@@ -429,8 +429,16 @@ struct ScreenRecorder {
         videoInput.markAsFinished()
         audioInput?.markAsFinished()
         microphoneInput?.markAsFinished()
-        
+
         await assetWriter.finishWriting()
+
+        // Log dropped samples summary
+        if streamOutput.droppedVideoFrameCount > 0 {
+            print("Dropped \(streamOutput.droppedVideoFrameCount) video frame(s) during recording")
+        }
+        if streamOutput.droppedAudioSampleCount > 0 {
+            print("Dropped \(streamOutput.droppedAudioSampleCount) audio sample(s) during recording")
+        }
     }
 
     private class StreamOutput: NSObject, SCStreamOutput {
@@ -441,6 +449,8 @@ struct ScreenRecorder {
         var sessionStarted = false
         var firstSampleTime: CMTime = .zero
         var lastSampleBuffer: CMSampleBuffer?
+        var droppedAudioSampleCount = 0
+        var droppedVideoFrameCount = 0
 
         init(videoInput: AVAssetWriterInput, 
              audioInput: AVAssetWriterInput? = nil, 
@@ -471,7 +481,7 @@ struct ScreenRecorder {
         
         private func handleVideoSampleBuffer(_ sampleBuffer: CMSampleBuffer) {
             guard videoInput.isReadyForMoreMediaData else {
-                print("AVAssetWriterInput (video) isn't ready, dropping frame")
+                droppedVideoFrameCount += 1
                 return
             }
             
@@ -530,7 +540,7 @@ struct ScreenRecorder {
             }
 
             guard audioInput.isReadyForMoreMediaData else {
-                // Only log occasionally to avoid spam
+                droppedAudioSampleCount += 1
                 return
             }
 
