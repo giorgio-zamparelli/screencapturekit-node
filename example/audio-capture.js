@@ -152,7 +152,7 @@ async function main() {
       // Screen required even for audio only
       screenId: selectedScreen.id,
       // Audio
-      audioDeviceId: selectedAudioDevice?.id,
+      captureSystemAudio: !!selectedAudioDevice,
       microphoneDeviceId: selectedMic?.id,
       // Option to automatically convert to MP3
       audioOnly: true,

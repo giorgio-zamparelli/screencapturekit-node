@@ -20,7 +20,7 @@ struct Options: Decodable {
     let showCursor: Bool
     let highlightClicks: Bool
     let screenId: CGDirectDisplayID
-    let audioDeviceId: String?
+    let captureSystemAudio: Bool?
     let microphoneDeviceId: String?
     let videoCodec: String?
     let enableHDR: Bool?
@@ -63,11 +63,11 @@ extension ScreenCaptureKitCLI {
                 }
 
                 let screenRecorder = try await ScreenRecorder(
-                    url: options.destination, 
-                    displayID: options.screenId, 
-                    showCursor: options.showCursor, 
+                    url: options.destination,
+                    displayID: options.screenId,
+                    showCursor: options.showCursor,
                     cropRect: options.cropRect,
-                    audioDeviceId: options.audioDeviceId,
+                    captureSystemAudio: options.captureSystemAudio ?? false,
                     microphoneDeviceId: options.microphoneDeviceId,
                     enableHDR: options.enableHDR ?? false,
                     useDirectRecordingAPI: options.useDirectRecordingAPI ?? false
@@ -182,11 +182,11 @@ struct ScreenRecorder {
     private var useDirectRecording: Bool
 
     init(
-        url: URL, 
-        displayID: CGDirectDisplayID, 
-        showCursor: Bool = true, 
+        url: URL,
+        displayID: CGDirectDisplayID,
+        showCursor: Bool = true,
         cropRect: CGRect? = nil,
-        audioDeviceId: String? = nil,
+        captureSystemAudio: Bool = false,
         microphoneDeviceId: String? = nil,
         enableHDR: Bool = false,
         useDirectRecordingAPI: Bool = false
@@ -241,18 +241,18 @@ struct ScreenRecorder {
         videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: outputSettings)
         videoInput.expectsMediaDataInRealTime = true
         
-        // Configure audio input if an audio device is specified
-        if audioDeviceId != nil {
+        // Configure audio input if system audio capture is enabled
+        if captureSystemAudio {
             let audioSettings: [String: Any] = [
                 AVFormatIDKey: kAudioFormatMPEG4AAC,
                 AVSampleRateKey: 48000,
                 AVNumberOfChannelsKey: 2,
                 AVEncoderBitRateKey: 256000
             ]
-            
+
             audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
             audioInput?.expectsMediaDataInRealTime = true
-            
+
             if let audioInput = audioInput, assetWriter.canAdd(audioInput) {
                 assetWriter.add(audioInput)
             }
@@ -338,10 +338,10 @@ struct ScreenRecorder {
             config.width = Int(cropRect.width) * displayScaleFactor
             config.height = Int(cropRect.height) * displayScaleFactor
         }
-        
-        // Configure system audio capture if needed
-        if let _ = audioDeviceId {
-            config.capturesAudio = true
+
+        // Configure system audio capture (disabled by default)
+        config.capturesAudio = captureSystemAudio
+        if captureSystemAudio {
             config.excludesCurrentProcessAudio = true
             print("System audio capture enabled")
         }
@@ -384,7 +384,7 @@ struct ScreenRecorder {
         if !useDirectRecordingAPI || !self.useDirectRecording {
             try stream.addStreamOutput(streamOutput, type: .screen, sampleHandlerQueue: videoSampleBufferQueue)
             
-            if audioDeviceId != nil {
+            if captureSystemAudio {
                 try stream.addStreamOutput(streamOutput, type: .audio, sampleHandlerQueue: audioSampleBufferQueue)
             }
             

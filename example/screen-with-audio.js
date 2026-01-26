@@ -53,7 +53,7 @@ async function main() {
     // Capture options
     const options = {
       screenId: screen.id,
-      audioDeviceId: selectedAudio.id,
+      captureSystemAudio: true,
       fps: 30,
       showCursor: true,
       highlightClicks: true

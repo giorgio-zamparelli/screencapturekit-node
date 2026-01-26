@@ -111,7 +111,7 @@ export type { MicrophoneDevice };
  * @property {boolean} showCursor - Show the cursor in the recording.
  * @property {boolean} highlightClicks - Highlight mouse clicks.
  * @property {number} screenId - Identifier of the screen to capture.
- * @property {string} [audioDeviceId] - Identifier of the system audio device.
+ * @property {boolean} [captureSystemAudio] - Capture system audio (default: false).
  * @property {string} [microphoneDeviceId] - Identifier of the microphone device.
  * @property {string} videoCodec - Video codec to use.
  * @property {boolean} [enableHDR] - Enable HDR recording (on macOS 13.0+).
@@ -125,7 +125,7 @@ type RecordingOptions = {
   showCursor: boolean;
   highlightClicks: boolean;
   screenId: number;
-  audioDeviceId?: string;
+  captureSystemAudio?: boolean;
   microphoneDeviceId?: string;
   videoCodec?: string;
   enableHDR?: boolean;
@@ -144,7 +144,7 @@ export type { RecordingOptions };
  * @property {boolean} showCursor - Show the cursor in the recording.
  * @property {boolean} highlightClicks - Highlight mouse clicks.
  * @property {number} screenId - Identifier of the screen to capture.
- * @property {string} [audioDeviceId] - Identifier of the system audio device.
+ * @property {boolean} [captureSystemAudio] - Capture system audio (default: false).
  * @property {string} [microphoneDeviceId] - Identifier of the microphone device.
  * @property {string} [videoCodec] - Video codec to use.
  * @property {Array} [cropRect] - Coordinates of the cropping area.
@@ -158,7 +158,7 @@ type RecordingOptionsForScreenCaptureKit = {
   showCursor: boolean;
   highlightClicks: boolean;
   screenId: number;
-  audioDeviceId?: string;
+  captureSystemAudio?: boolean;
   microphoneDeviceId?: string;
   videoCodec?: string;
   cropRect?: [[x: number, y: number], [width: number, height: number]];
@@ -212,7 +212,7 @@ export class ScreenCaptureKit {
    * @param {boolean} [options.showCursor=true] - Show the cursor.
    * @param {boolean} [options.highlightClicks=false] - Highlight mouse clicks.
    * @param {number} [options.screenId=0] - Screen ID to capture.
-   * @param {string} [options.audioDeviceId] - System audio device ID.
+   * @param {boolean} [options.captureSystemAudio=false] - Capture system audio.
    * @param {string} [options.microphoneDeviceId] - Microphone device ID.
    * @param {string} [options.videoCodec="h264"] - Video codec to use.
    * @param {boolean} [options.enableHDR=false] - Enable HDR recording.
@@ -227,7 +227,7 @@ export class ScreenCaptureKit {
     showCursor = true,
     highlightClicks = false,
     screenId = 0,
-    audioDeviceId = undefined,
+    captureSystemAudio = false,
     microphoneDeviceId = undefined,
     videoCodec = "h264",
     enableHDR = false,
@@ -243,7 +243,7 @@ export class ScreenCaptureKit {
       showCursor,
       highlightClicks,
       screenId,
-      audioDeviceId,
+      captureSystemAudio,
       microphoneDeviceId,
       videoCodec,
       enableHDR,
@@ -267,7 +267,7 @@ export class ScreenCaptureKit {
         showCursor,
         highlightClicks,
         screenId,
-        audioDeviceId,
+        captureSystemAudio,
       };
 
       if (highlightClicks === true) {
@@ -382,7 +382,7 @@ export class ScreenCaptureKit {
 
     // If we have multiple audio sources, we need to merge them
     const hasMultipleAudioTracks = !!(
-      this.currentOptions?.audioDeviceId && 
+      this.currentOptions?.captureSystemAudio &&
       this.currentOptions?.microphoneDeviceId
     );
 

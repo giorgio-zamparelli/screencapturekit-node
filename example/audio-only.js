@@ -86,7 +86,7 @@ async function main() {
     // Basic options for audio-only recording
     const options = {
       screenId: availableScreens[0].id,
-      audioDeviceId: selectedAudioDevice?.id,
+      captureSystemAudio: !!selectedAudioDevice,
       microphoneDeviceId: selectedMicDevice?.id,
       audioOnly: true,
       fps: 1,
