@@ -329,6 +329,15 @@ struct ScreenRecorder {
         // Configurer la fréquence d'images
         config.minimumFrameInterval = CMTime(value: 1, timescale: Int32(truncating: NSNumber(value: showCursor ? 60 : 30)))
         config.showsCursor = showCursor
+
+        // Configure crop area if specified
+        if let cropRect = cropRect {
+            // Set the source rectangle to capture only the specified region
+            config.sourceRect = cropRect
+            // Set output dimensions to match the crop area (scaled by display factor)
+            config.width = Int(cropRect.width) * displayScaleFactor
+            config.height = Int(cropRect.height) * displayScaleFactor
+        }
         
         // Configurer la capture du son système si nécessaire
         if let _ = audioDeviceId {
