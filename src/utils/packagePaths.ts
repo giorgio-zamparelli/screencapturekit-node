@@ -14,7 +14,7 @@ export const getPackageRoot = () => {
     return path.join(__dirname, "..", "..", "dist");
   }
   try {
-    // Résolution via le point d'entrée du package
+    // Resolution via package entry point
     const app = require("electron").app;
     const packageMainPath = require.resolve("screencapturekit");
     if (typeof process.resourcesPath === "string" && app?.isPackaged) {
@@ -24,7 +24,7 @@ export const getPackageRoot = () => {
     const finalPath = path.dirname(packageMainPath);
     return finalPath;
   } catch (e) {
-    // Fallback pour le développement ES modules
+    // Fallback for ES modules development
     const __filename = fileURLToPath(import.meta.url);
     const finalPath = path.join(path.dirname(__filename));
     console.log("finalPath : ESM", finalPath);

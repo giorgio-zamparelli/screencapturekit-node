@@ -236,7 +236,7 @@ export class ScreenCaptureKit {
     outputFilePath = undefined,
   }: Partial<RecordingOptions> = {}) {
     this.processId = getRandomId();
-    // Stocke les options actuelles pour utilisation ultérieure
+    // Store current options for later use
     this.currentOptions = {
       fps,
       cropArea,
@@ -353,34 +353,34 @@ export class ScreenCaptureKit {
    */
   async stopRecording() {
     this.throwIfNotStarted();
-    console.log("Arrêt de l'enregistrement");
+    console.log("Stopping recording");
     this.recorder?.kill();
     await this.recorder;
-    console.log("Enregistrement arrêté");
+    console.log("Recording stopped");
     this.recorder = undefined;
 
     if (!this.videoPath) {
       return null;
     }
 
-    // Ajoutons un délai pour s'assurer que le fichier est complètement écrit
+    // Add a delay to ensure the file is completely written
     await new Promise(resolve => setTimeout(resolve, 1000));
     
     let currentFile = this.videoPath;
 
-    // Vérifier si le fichier existe et a une taille
+    // Check if the file exists and has content
     try {
       const stats = fs.statSync(currentFile);
       if (stats.size === 0) {
-        console.error("Le fichier d'enregistrement est vide");
+        console.error("Recording file is empty");
         return null;
       }
     } catch (error) {
-      console.error("Erreur lors de la vérification du fichier d'enregistrement:", error);
+      console.error("Error checking recording file:", error);
       return null;
     }
 
-    // Si nous avons plusieurs sources audio, nous devons les fusionner
+    // If we have multiple audio sources, we need to merge them
     const hasMultipleAudioTracks = !!(
       this.currentOptions?.audioDeviceId && 
       this.currentOptions?.microphoneDeviceId
@@ -388,10 +388,10 @@ export class ScreenCaptureKit {
 
     if (hasMultipleAudioTracks) {
       try {
-        console.log("Fusion des pistes audio avec ffmpeg");
+        console.log("Merging audio tracks with ffmpeg");
         this.processedVideoPath = createTempFile({ extension: "mp4" });
         
-        // Vérifier la structure du fichier avec ffprobe
+        // Check file structure with ffprobe
         const { stdout: probeOutput } = await execa("ffprobe", [
           "-v", "error",
           "-show_entries", "stream=index,codec_type",
@@ -402,7 +402,7 @@ export class ScreenCaptureKit {
         const probeResult = JSON.parse(probeOutput);
         const streams = probeResult.streams || [];
         
-        // Identifier les indices des flux audio et vidéo
+        // Identify audio and video stream indices
         const audioStreams = streams
           .filter((stream: {codec_type: string; index: number}) => stream.codec_type === "audio")
           .map((stream: {index: number}) => stream.index);
@@ -411,14 +411,14 @@ export class ScreenCaptureKit {
           .find((stream: {codec_type: string; index: number}) => stream.codec_type === "video")?.index;
           
         if (audioStreams.length < 2 || videoStream === undefined) {
-          console.log("Pas assez de pistes audio pour fusionner ou pas de piste vidéo");
+          console.log("Not enough audio tracks to merge or no video track");
         } else {
           const systemAudioIndex = audioStreams[0];
           const microphoneIndex = audioStreams[1];
           
           const filterComplex = `[0:${systemAudioIndex}]volume=1[a1];[0:${microphoneIndex}]volume=3[a2];[a1][a2]amerge=inputs=2[aout]`;
           
-          // Traitement vidéo
+          // Process video
           await execa("ffmpeg", [
             "-i", currentFile,
             "-filter_complex", filterComplex,
@@ -435,14 +435,14 @@ export class ScreenCaptureKit {
           currentFile = this.processedVideoPath;
         }
       } catch (error) {
-        console.error("Erreur lors de la fusion des pistes audio:", error);
+        console.error("Error merging audio tracks:", error);
       }
     }
 
-    // Si audioOnly est activé, convertir en MP3
+    // If audioOnly is enabled, convert to MP3
     if (this.currentOptions?.audioOnly) {
       try {
-        console.log("Conversion en MP3");
+        console.log("Converting to MP3");
         const audioPath = createTempFile({ extension: "mp3" });
         
         await execa("ffmpeg", [
@@ -456,7 +456,7 @@ export class ScreenCaptureKit {
         
         return audioPath;
       } catch (error) {
-        console.error("Erreur lors de la conversion en MP3:", error);
+        console.error("Error converting to MP3:", error);
         return currentFile;
       }
     }
@@ -557,30 +557,30 @@ export const supportsHDRCapture = supportsHDR;
  */
 export const videoCodecs = getCodecs();
 
-// Fonction de remplacement pour temporaryFile sans créer le fichier
+// Replacement function for temporaryFile without creating the file
 function createTempFile(options: { extension?: string } = {}): string {
   const tempDir = os.tmpdir();
   const randomId = uuidv4();
   const extension = options.extension ? `.${options.extension}` : '';
   const tempFilePath = path.join(tempDir, `${randomId}${extension}`);
   
-  // Ne pas créer le fichier, juste retourner le chemin
+  // Don't create the file, just return the path
   return tempFilePath;
 }
 
-// Fonction personnalisée pour remplacer fileUrl
+// Custom function to replace fileUrl
 function fileUrlFromPath(filePath: string): string {
-  // Encodage des caractères spéciaux
+  // Encode special characters
   let pathName = filePath.replace(/\\/g, '/');
   
-  // Assurez-vous que le chemin commence par un slash si ce n'est pas déjà le cas
+  // Make sure the path starts with a slash if it doesn't already
   if (pathName[0] !== '/') {
     pathName = '/' + pathName;
   }
   
-  // Encodage des caractères spéciaux dans l'URL
+  // Encode special characters in the URL
   pathName = encodeURI(pathName)
-    // Encodage supplémentaire pour les caractères qui ne sont pas gérés par encodeURI
+    // Additional encoding for characters not handled by encodeURI
     .replace(/#/g, '%23')
     .replace(/\?/g, '%3F');
   

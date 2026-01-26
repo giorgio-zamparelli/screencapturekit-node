@@ -212,7 +212,7 @@ struct ScreenRecorder {
         // AVAssetWriterInput supports maximum resolution of 4096x2304 for H.264
         let videoSize = downsizedVideoSize(source: cropRect?.size ?? displaySize, scaleFactor: displayScaleFactor)
 
-        // Utiliser le preset 4K maximal
+        // Use the maximum 4K preset
         guard let assistant = AVOutputSettingsAssistant(preset: .preset3840x2160) else {
             throw RecordingError("Can't create AVOutputSettingsAssistant with .preset3840x2160")
         }
@@ -296,37 +296,37 @@ struct ScreenRecorder {
 
         // MARK: SCStream setup
 
-        // Obtenir le contenu partageable
+        // Get shareable content
         let sharableContent = try await SCShareableContent.current
         print("Displays: \(sharableContent.displays.count), Windows: \(sharableContent.windows.count), Apps: \(sharableContent.applications.count)")
         
-        // Trouver l'écran demandé
+        // Find the requested screen
         guard let display = sharableContent.displays.first(where: { $0.displayID == displayID }) else {
             throw RecordingError("No display with ID \(displayID) found")
         }
         
         let filter = SCContentFilter(display: display, excludingWindows: [])
         
-        // Configurer le stream
+        // Configure the stream
         var config: SCStreamConfiguration
         
         if enableHDR, #available(macOS 13.0, *) {
-            // Pour macOS 15+, utiliser le preset HDR
+            // For macOS 15+, use the HDR preset
             if #available(macOS 15.0, *) {
                 let preset = SCStreamConfiguration.Preset.captureHDRStreamCanonicalDisplay
                 config = SCStreamConfiguration(preset: preset)
             } else {
-                // Fallback pour macOS 13-14
+                // Fallback for macOS 13-14
                 config = SCStreamConfiguration()
-                // Pour macOS 13-14, nous n'avons pas de méthode simple pour activer HDR
-                // sans utiliser d'API dépréciée
+                // For macOS 13-14, we don't have a simple method to enable HDR
+                // without using deprecated APIs
                 print("HDR enabled but limited support on this macOS version")
             }
         } else {
             config = SCStreamConfiguration()
         }
         
-        // Configurer la fréquence d'images
+        // Configure frame rate
         config.minimumFrameInterval = CMTime(value: 1, timescale: Int32(truncating: NSNumber(value: showCursor ? 60 : 30)))
         config.showsCursor = showCursor
 
@@ -339,14 +339,14 @@ struct ScreenRecorder {
             config.height = Int(cropRect.height) * displayScaleFactor
         }
         
-        // Configurer la capture du son système si nécessaire
+        // Configure system audio capture if needed
         if let _ = audioDeviceId {
             config.capturesAudio = true
             config.excludesCurrentProcessAudio = true
             print("System audio capture enabled")
         }
         
-        // Configurer la capture de microphone si nécessaire
+        // Configure microphone capture if needed
         if let microphoneDeviceId = microphoneDeviceId {
             if #available(macOS 15.0, *) {
                 config.captureMicrophone = true
@@ -356,10 +356,10 @@ struct ScreenRecorder {
             }
         }
         
-        // Créer le stream
+        // Create the stream
         stream = SCStream(filter: filter, configuration: config, delegate: nil)
         
-        // Utiliser l'API d'enregistrement direct si spécifié
+        // Use the direct recording API if specified
         if useDirectRecordingAPI {
             if #available(macOS 15.0, *) {
                 let recordingConfig = SCRecordingOutputConfiguration()
@@ -380,7 +380,7 @@ struct ScreenRecorder {
             }
         }
         
-        // Configuration de sortie de stream pour l'enregistrement manuel
+        // Configure stream output for manual recording
         if !useDirectRecordingAPI || !self.useDirectRecording {
             try stream.addStreamOutput(streamOutput, type: .screen, sampleHandlerQueue: videoSampleBufferQueue)
             
@@ -584,8 +584,8 @@ class RecordingDelegate: NSObject, SCRecordingOutputDelegate {
 
 extension AVCaptureDevice {
     var manufacturer: String {
-        // La méthode properties n'existe pas
-        // Utilisons une valeur par défaut
+        // The properties method doesn't exist
+        // Use a default value
         return "Unknown"
     }
 }

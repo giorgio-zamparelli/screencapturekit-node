@@ -1,4 +1,4 @@
-// Exemple de capture audio (système et microphone)
+// Example of audio capture (system and microphone)
 import createScreenRecorder from 'screencapturekit';
 import { screens, audioDevices, microphoneDevices } from 'screencapturekit';
 import { exec } from 'child_process';
@@ -13,55 +13,55 @@ import os from 'os';
 const execAsync = promisify(exec);
 const __dirname = dirname(fileURLToPath(import.meta.url));
 
-// Durée d'enregistrement en millisecondes
-const RECORDING_DURATION = 15000; // 15 secondes
+// Recording duration in milliseconds
+const RECORDING_DURATION = 15000; // 15 seconds
 
-// Créer une interface readline pour l'interaction utilisateur
+// Create a readline interface for user interaction
 const rl = readline.createInterface({
   input: process.stdin,
   output: process.stdout
 });
 
-// Fonction pour poser une question et obtenir une réponse
+// Function to ask a question and get an answer
 function question(query) {
   return new Promise(resolve => rl.question(query, resolve));
 }
 
-// Fonction pour choisir un périphérique dans une liste
+// Function to choose a device from a list
 async function chooseDevice(devices, type) {
   if (!devices || devices.length === 0) {
     return null;
   }
-  
-  console.log(`\nPériphériques ${type} disponibles:`);
+
+  console.log(`\nAvailable ${type} devices:`);
   devices.forEach((device, index) => {
-    console.log(`   [${index}] ${device.name} (${device.manufacturer || 'Fabricant inconnu'}) (ID=${device.id})`);
+    console.log(`   [${index}] ${device.name} (${device.manufacturer || 'Unknown manufacturer'}) (ID=${device.id})`);
   });
-  
+
   const defaultChoice = 0;
-  const input = await question(`Choisissez un périphérique ${type} [0-${devices.length - 1}] (défaut: ${defaultChoice}): `);
+  const input = await question(`Choose a ${type} device [0-${devices.length - 1}] (default: ${defaultChoice}): `);
   const choice = input === '' ? defaultChoice : parseInt(input, 10);
-  
+
   if (isNaN(choice) || choice < 0 || choice >= devices.length) {
-    console.log(`Choix invalide, utilisation du périphérique ${defaultChoice}`);
+    console.log(`Invalid choice, using device ${defaultChoice}`);
     return devices[defaultChoice];
   }
-  
+
   return devices[choice];
 }
 
 async function openYouTubeInBrowser(url) {
-  console.log(`Ouverture de ${url} dans le navigateur par défaut...`);
+  console.log(`Opening ${url} in the default browser...`);
   try {
     await execAsync(`open "${url}"`);
     return true;
   } catch (error) {
-    console.error(`Erreur lors de l'ouverture du navigateur: ${error.message}`);
+    console.error(`Error opening browser: ${error.message}`);
     return false;
   }
 }
 
-// Fonction pour générer un nom de fichier audio unique
+// Function to generate a unique audio file name
 function generateAudioFileName() {
   const timestamp = new Date().toISOString().replace(/[:.]/g, '-');
   return path.join(os.tmpdir(), `audio-capture-${timestamp}.m4a`);
@@ -69,94 +69,94 @@ function generateAudioFileName() {
 
 async function main() {
   try {
-    console.log('=== CONFIGURATION DE CAPTURE AUDIO ===');
-    
-    // Obtenir les écrans disponibles (nécessaire même pour l'audio uniquement)
+    console.log('=== AUDIO CAPTURE CONFIGURATION ===');
+
+    // Get available screens (required even for audio only)
     const availableScreens = await screens();
     if (!availableScreens || availableScreens.length === 0) {
-      throw new Error('Aucun écran disponible pour l\'enregistrement, nécessaire même pour l\'audio');
+      throw new Error('No screen available for recording, required even for audio');
     }
-    
-    // Utiliser le premier écran disponible
+
+    // Use the first available screen
     const selectedScreen = availableScreens[0];
-    console.log(`\nÉcran utilisé pour la capture (nécessaire pour l'API): ${selectedScreen.width}x${selectedScreen.height}`);
+    console.log(`\nScreen used for capture (required for API): ${selectedScreen.width}x${selectedScreen.height}`);
     
-    // Obtenir les périphériques audio système
+    // Get system audio devices
     const systemAudioDevices = await audioDevices();
     let selectedAudioDevice = null;
     let captureSystemAudio = false;
-    
+
     if (!systemAudioDevices || systemAudioDevices.length === 0) {
-      console.warn('⚠️ Aucun périphérique audio système disponible');
+      console.warn('⚠️ No system audio device available');
     } else {
-      // Demander si l'utilisateur veut capturer l'audio système
-      const captureAudio = await question('\nVoulez-vous capturer l\'audio système? (O/n): ');
+      // Ask if user wants to capture system audio
+      const captureAudio = await question('\nDo you want to capture system audio? (Y/n): ');
       captureSystemAudio = captureAudio.toLowerCase() !== 'n';
-      
+
       if (captureSystemAudio) {
-        // Choisir un périphérique audio
+        // Choose an audio device
         selectedAudioDevice = await chooseDevice(systemAudioDevices, 'audio');
         if (selectedAudioDevice) {
-          console.log(`\n✅ Périphérique audio sélectionné: ${selectedAudioDevice.name} (ID=${selectedAudioDevice.id})`);
+          console.log(`\n✅ Selected audio device: ${selectedAudioDevice.name} (ID=${selectedAudioDevice.id})`);
         }
       }
     }
     
-    // Obtenir les microphones
+    // Get microphones
     let micDevices = [];
     let selectedMic = null;
     let captureMicrophone = false;
-    
+
     try {
       micDevices = await microphoneDevices();
-      
+
       if (!micDevices || micDevices.length === 0) {
-        console.warn('⚠️ Aucun microphone disponible');
+        console.warn('⚠️ No microphone available');
       } else {
-        // Demander si l'utilisateur veut capturer le microphone
-        const captureMic = await question('\nVoulez-vous capturer le microphone? (O/n): ');
+        // Ask if user wants to capture microphone
+        const captureMic = await question('\nDo you want to capture microphone? (Y/n): ');
         captureMicrophone = captureMic.toLowerCase() !== 'n';
-        
+
         if (captureMicrophone) {
-          // Choisir un microphone
+          // Choose a microphone
           selectedMic = await chooseDevice(micDevices, 'microphone');
           if (selectedMic) {
-            console.log(`\n✅ Microphone sélectionné: ${selectedMic.name} (ID=${selectedMic.id})`);
+            console.log(`\n✅ Selected microphone: ${selectedMic.name} (ID=${selectedMic.id})`);
           }
         }
       }
     } catch (error) {
-      console.warn(`⚠️ Capture microphone non disponible: ${error.message}`);
+      console.warn(`⚠️ Microphone capture not available: ${error.message}`);
     }
     
-    // Vérifier qu'au moins une source audio est sélectionnée
+    // Check that at least one audio source is selected
     if (!captureSystemAudio && !captureMicrophone) {
-      console.error('❌ Erreur: Aucune source audio sélectionnée. Au moins une source est nécessaire.');
+      console.error('❌ Error: No audio source selected. At least one source is required.');
       rl.close();
       return;
     }
-    
-    // Demander la durée d'enregistrement
-    const durationInput = await question(`\nDurée d'enregistrement en secondes (défaut: ${RECORDING_DURATION/1000}): `);
+
+    // Ask for recording duration
+    const durationInput = await question(`\nRecording duration in seconds (default: ${RECORDING_DURATION/1000}): `);
     const duration = durationInput === '' ? RECORDING_DURATION : parseInt(durationInput, 10) * 1000;
-    
+
     if (isNaN(duration) || duration <= 0) {
-      console.log(`Durée invalide, utilisation de la valeur par défaut: ${RECORDING_DURATION/1000} secondes`);
+      console.log(`Invalid duration, using default value: ${RECORDING_DURATION/1000} seconds`);
     }
     
-    // Créer un enregistreur
+    // Create a recorder
     const recorder = createScreenRecorder();
-    
-    // Préparer les options
+
+    // Prepare options
     const options = {
-      // Écran requis même pour l'audio uniquement
+      // Screen required even for audio only
       screenId: selectedScreen.id,
       // Audio
       audioDeviceId: selectedAudioDevice?.id,
       microphoneDeviceId: selectedMic?.id,
-      // Option pour convertir automatiquement en MP3
+      // Option to automatically convert to MP3
       audioOnly: true,
-      // Paramètres minimaux car on ne garde que l'audio
+      // Minimal settings since we only keep audio
       fps: 1,
       showCursor: false,
       highlightClicks: false,
@@ -167,44 +167,44 @@ async function main() {
         height: 1
       }
     };
-    
-    console.log('\nOptions d\'enregistrement:');
+
+    console.log('\nRecording options:');
     console.log(JSON.stringify(options, null, 2));
-    
-    // Demander confirmation pour démarrer
-    const startConfirm = await question('\nDémarrer l\'enregistrement audio? (O/n): ');
-    
+
+    // Ask for confirmation to start
+    const startConfirm = await question('\nStart audio recording? (Y/n): ');
+
     if (startConfirm.toLowerCase() === 'n') {
-      console.log('Enregistrement annulé.');
+      console.log('Recording cancelled.');
       rl.close();
       return;
     }
-    
-    // Démarrer l'enregistrement
-    console.log('\nDémarrage de l\'enregistrement audio...');
+
+    // Start recording
+    console.log('\nStarting audio recording...');
     await recorder.startRecording(options);
     
-    // Ouvrir YouTube dans le navigateur
+    // Open YouTube in browser
     const youtubeURL = 'https://www.youtube.com/watch?v=xvFZjo5PgG0';
     await openYouTubeInBrowser(youtubeURL);
-    
-    console.log(`\nEnregistrement en cours pendant ${duration/1000} secondes...`);
-    
+
+    console.log(`\nRecording in progress for ${duration/1000} seconds...`);
+
     if (captureMicrophone) {
-      console.log('Parlez dans votre microphone pour tester la capture audio!');
+      console.log('Speak into your microphone to test audio capture!');
     }
-    
-    // Attendre la durée spécifiée
+
+    // Wait for the specified duration
     await new Promise(resolve => setTimeout(resolve, duration));
-    
-    // Arrêter l'enregistrement
-    console.log('Arrêt de l\'enregistrement...');
+
+    // Stop recording
+    console.log('Stopping recording...');
     const audioPath = await recorder.stopRecording();
-    
-    console.log(`\n✅ Audio enregistré à: ${audioPath}`);
-    console.log('   L\'enregistrement contient:');
-    console.log(`   - Audio système: ${captureSystemAudio ? '✅' : '❌'}`);
-    console.log(`   - Audio microphone: ${captureMicrophone ? '✅' : '❌'}`);
+
+    console.log(`\n✅ Audio recorded at: ${audioPath}`);
+    console.log('   Recording contains:');
+    console.log(`   - System audio: ${captureSystemAudio ? '✅' : '❌'}`);
+    console.log(`   - Microphone audio: ${captureMicrophone ? '✅' : '❌'}`);
     
     rl.close();
   } catch (error) {

@@ -5,7 +5,7 @@ import PackageDescription
 
 let package = Package(
     name: "screencapturekit-cli",
-    platforms: [.macOS(.v13)], // HDR nécessite macOS 13+, certaines fonctionnalités microphone nécessitent macOS 15+
+    platforms: [.macOS(.v13)], // HDR requires macOS 13+, some microphone features require macOS 15+
     dependencies: [
         .package(url: "https://github.com/apple/swift-argument-parser.git", from: "1.2.2"),
     ],
