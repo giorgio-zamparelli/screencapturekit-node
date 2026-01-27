@@ -546,6 +546,15 @@ struct ScreenRecorder {
 
             // Retime audio sample buffer to match video timeline
             let presentationTime = sampleBuffer.presentationTimeStamp - firstSampleTime
+
+            // Discard audio samples with negative presentation times
+            // This happens when the audio source (e.g., external microphone/audio interface)
+            // has timestamps from before the first video frame was captured
+            if presentationTime < .zero {
+                droppedAudioSampleCount += 1
+                return
+            }
+
             let timing = CMSampleTimingInfo(
                 duration: sampleBuffer.duration,
                 presentationTimeStamp: presentationTime,
