@@ -118,6 +118,8 @@ export type { MicrophoneDevice };
  * @property {boolean} [recordToFile] - Use the direct recording API (on macOS 14.0+).
  * @property {boolean} [audioOnly] - Record audio only, will convert to mp3 after recording.
  * @property {string} [outputFilePath] - Custom output file path. If not specified, a temp file is created.
+ * @property {number} [audioBitRate] - Audio bitrate in bps (default: 320000 for high quality).
+ * @property {string} [audioCodec] - Audio codec: "aac" (default), "alac" (lossless), or "pcm" (uncompressed).
  */
 type RecordingOptions = {
   fps: number;
@@ -132,6 +134,8 @@ type RecordingOptions = {
   recordToFile?: boolean;
   audioOnly?: boolean;
   outputFilePath?: string;
+  audioBitRate?: number;
+  audioCodec?: "aac" | "alac" | "pcm";
 };
 
 export type { RecordingOptions };
@@ -150,6 +154,8 @@ export type { RecordingOptions };
  * @property {Array} [cropRect] - Coordinates of the cropping area.
  * @property {boolean} [enableHDR] - Enable HDR recording.
  * @property {boolean} [useDirectRecordingAPI] - Use the direct recording API.
+ * @property {number} [audioBitRate] - Audio bitrate in bps.
+ * @property {string} [audioCodec] - Audio codec to use.
  * @private
  */
 type RecordingOptionsForScreenCaptureKit = {
@@ -164,6 +170,8 @@ type RecordingOptionsForScreenCaptureKit = {
   cropRect?: [[x: number, y: number], [width: number, height: number]];
   enableHDR?: boolean;
   useDirectRecordingAPI?: boolean;
+  audioBitRate?: number;
+  audioCodec?: string;
 };
 
 export type { RecordingOptionsForScreenCaptureKit };
@@ -234,6 +242,8 @@ export class ScreenCaptureKit {
     recordToFile = false,
     audioOnly = false,
     outputFilePath = undefined,
+    audioBitRate = 320000,
+    audioCodec = "aac",
   }: Partial<RecordingOptions> = {}) {
     this.processId = getRandomId();
     // Store current options for later use
@@ -250,6 +260,8 @@ export class ScreenCaptureKit {
       recordToFile,
       audioOnly,
       outputFilePath,
+      audioBitRate,
+      audioCodec,
     };
 
     return new Promise((resolve, reject) => {
@@ -259,7 +271,7 @@ export class ScreenCaptureKit {
       }
 
       this.videoPath = outputFilePath || createTempFile({ extension: "mp4" });
-      
+
       console.log(this.videoPath);
       const recorderOptions: RecordingOptionsForScreenCaptureKit = {
         destination: fileUrlFromPath(this.videoPath as string),
@@ -268,6 +280,8 @@ export class ScreenCaptureKit {
         highlightClicks,
         screenId,
         captureSystemAudio,
+        audioBitRate,
+        audioCodec,
       };
 
       if (highlightClicks === true) {

@@ -25,6 +25,8 @@ struct Options: Decodable {
     let videoCodec: String?
     let enableHDR: Bool?
     let useDirectRecordingAPI: Bool?
+    let audioBitRate: Int?
+    let audioCodec: String?
 }
 
 @main
@@ -70,7 +72,9 @@ extension ScreenCaptureKitCLI {
                     captureSystemAudio: options.captureSystemAudio ?? false,
                     microphoneDeviceId: options.microphoneDeviceId,
                     enableHDR: options.enableHDR ?? false,
-                    useDirectRecordingAPI: options.useDirectRecordingAPI ?? false
+                    useDirectRecordingAPI: options.useDirectRecordingAPI ?? false,
+                    audioBitRate: options.audioBitRate ?? 320000,
+                    audioCodec: options.audioCodec ?? "aac"
                 )
                 
                 print("Starting screen recording of display \(options.screenId)")
@@ -189,7 +193,9 @@ struct ScreenRecorder {
         captureSystemAudio: Bool = false,
         microphoneDeviceId: String? = nil,
         enableHDR: Bool = false,
-        useDirectRecordingAPI: Bool = false
+        useDirectRecordingAPI: Bool = false,
+        audioBitRate: Int = 320000,
+        audioCodec: String = "aac"
     ) async throws {
         self.useDirectRecording = useDirectRecordingAPI
         
@@ -241,14 +247,42 @@ struct ScreenRecorder {
         videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: outputSettings)
         videoInput.expectsMediaDataInRealTime = true
         
+        // Helper function to create audio settings based on codec choice
+        func createAudioSettings(codec: String, bitRate: Int) -> [String: Any] {
+            switch codec.lowercased() {
+            case "alac", "lossless", "apple-lossless":
+                // Apple Lossless for highest quality (no bitrate needed)
+                return [
+                    AVFormatIDKey: kAudioFormatAppleLossless,
+                    AVSampleRateKey: 48000,
+                    AVNumberOfChannelsKey: 2,
+                    AVEncoderBitDepthHintKey: 24
+                ]
+            case "pcm", "linear-pcm", "uncompressed":
+                // Uncompressed PCM for maximum quality (largest file size)
+                return [
+                    AVFormatIDKey: kAudioFormatLinearPCM,
+                    AVSampleRateKey: 48000,
+                    AVNumberOfChannelsKey: 2,
+                    AVLinearPCMBitDepthKey: 24,
+                    AVLinearPCMIsFloatKey: false,
+                    AVLinearPCMIsBigEndianKey: false,
+                    AVLinearPCMIsNonInterleaved: false
+                ]
+            default:
+                // AAC with configurable bitrate (default)
+                return [
+                    AVFormatIDKey: kAudioFormatMPEG4AAC,
+                    AVSampleRateKey: 48000,
+                    AVNumberOfChannelsKey: 2,
+                    AVEncoderBitRateKey: bitRate
+                ]
+            }
+        }
+
         // Configure audio input if system audio capture is enabled
         if captureSystemAudio {
-            let audioSettings: [String: Any] = [
-                AVFormatIDKey: kAudioFormatMPEG4AAC,
-                AVSampleRateKey: 48000,
-                AVNumberOfChannelsKey: 2,
-                AVEncoderBitRateKey: 256000
-            ]
+            let audioSettings = createAudioSettings(codec: audioCodec, bitRate: audioBitRate)
 
             audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
             audioInput?.expectsMediaDataInRealTime = true
@@ -257,19 +291,14 @@ struct ScreenRecorder {
                 assetWriter.add(audioInput)
             }
         }
-        
+
         // Configure microphone input if a microphone device is specified
         if microphoneDeviceId != nil {
-            let micSettings: [String: Any] = [
-                AVFormatIDKey: kAudioFormatMPEG4AAC,
-                AVSampleRateKey: 48000,
-                AVNumberOfChannelsKey: 2,
-                AVEncoderBitRateKey: 256000
-            ]
-            
+            let micSettings = createAudioSettings(codec: audioCodec, bitRate: audioBitRate)
+
             microphoneInput = AVAssetWriterInput(mediaType: .audio, outputSettings: micSettings)
             microphoneInput?.expectsMediaDataInRealTime = true
-            
+
             if let microphoneInput = microphoneInput, assetWriter.canAdd(microphoneInput) {
                 assetWriter.add(microphoneInput)
             }
