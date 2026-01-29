@@ -247,22 +247,46 @@ struct ScreenRecorder {
         videoInput = AVAssetWriterInput(mediaType: .video, outputSettings: outputSettings)
         videoInput.expectsMediaDataInRealTime = true
         
+        // Helper function to get sample rate from a microphone device
+        func getMicrophoneSampleRate(deviceId: String?) -> Double {
+            guard let deviceId = deviceId else { return 48000 }
+
+            let discoverySession = AVCaptureDevice.DiscoverySession(
+                deviceTypes: [.builtInMicrophone, .externalUnknown],
+                mediaType: .audio,
+                position: .unspecified
+            )
+
+            if let device = discoverySession.devices.first(where: { $0.uniqueID == deviceId }) {
+                // Get the device's active format sample rate
+                let sampleRate = device.activeFormat.formatDescription.audioStreamBasicDescription?.mSampleRate ?? 48000
+                print("Detected microphone sample rate: \(Int(sampleRate)) Hz for device: \(device.localizedName)")
+                return sampleRate
+            }
+
+            print("Microphone device not found, using default 48000 Hz")
+            return 48000
+        }
+
+        // Detect microphone sample rate before creating audio settings
+        let microphoneSampleRate = getMicrophoneSampleRate(deviceId: microphoneDeviceId)
+
         // Helper function to create audio settings based on codec choice
-        func createAudioSettings(codec: String, bitRate: Int) -> [String: Any] {
+        func createAudioSettings(codec: String, bitRate: Int, sampleRate: Double = 48000) -> [String: Any] {
             switch codec.lowercased() {
             case "alac", "lossless", "apple-lossless":
-                // Apple Lossless for highest quality (no bitrate needed)
+                // Apple Lossless supports any sample rate, lossless quality
                 return [
                     AVFormatIDKey: kAudioFormatAppleLossless,
-                    AVSampleRateKey: 48000,
+                    AVSampleRateKey: sampleRate,
                     AVNumberOfChannelsKey: 2,
                     AVEncoderBitDepthHintKey: 24
                 ]
             case "pcm", "linear-pcm", "uncompressed":
-                // Uncompressed PCM for maximum quality (largest file size)
+                // Uncompressed PCM supports any sample rate
                 return [
                     AVFormatIDKey: kAudioFormatLinearPCM,
-                    AVSampleRateKey: 48000,
+                    AVSampleRateKey: sampleRate,
                     AVNumberOfChannelsKey: 2,
                     AVLinearPCMBitDepthKey: 24,
                     AVLinearPCMIsFloatKey: false,
@@ -270,10 +294,14 @@ struct ScreenRecorder {
                     AVLinearPCMIsNonInterleaved: false
                 ]
             default:
-                // AAC with configurable bitrate (default)
+                // AAC max sample rate is 48kHz - Core Audio will resample automatically
+                let aacSampleRate = min(sampleRate, 48000)
+                if sampleRate > 48000 {
+                    print("Note: Resampling from \(Int(sampleRate)) Hz to \(Int(aacSampleRate)) Hz for AAC (browser compatible)")
+                }
                 return [
                     AVFormatIDKey: kAudioFormatMPEG4AAC,
-                    AVSampleRateKey: 48000,
+                    AVSampleRateKey: aacSampleRate,
                     AVNumberOfChannelsKey: 2,
                     AVEncoderBitRateKey: bitRate
                 ]
@@ -282,7 +310,8 @@ struct ScreenRecorder {
 
         // Configure audio input if system audio capture is enabled
         if captureSystemAudio {
-            let audioSettings = createAudioSettings(codec: audioCodec, bitRate: audioBitRate)
+            // System audio uses standard 48kHz
+            let audioSettings = createAudioSettings(codec: audioCodec, bitRate: audioBitRate, sampleRate: 48000)
 
             audioInput = AVAssetWriterInput(mediaType: .audio, outputSettings: audioSettings)
             audioInput?.expectsMediaDataInRealTime = true
@@ -294,7 +323,8 @@ struct ScreenRecorder {
 
         // Configure microphone input if a microphone device is specified
         if microphoneDeviceId != nil {
-            let micSettings = createAudioSettings(codec: audioCodec, bitRate: audioBitRate)
+            // Use the detected microphone sample rate to avoid resampling artifacts
+            let micSettings = createAudioSettings(codec: audioCodec, bitRate: audioBitRate, sampleRate: microphoneSampleRate)
 
             microphoneInput = AVAssetWriterInput(mediaType: .audio, outputSettings: micSettings)
             microphoneInput?.expectsMediaDataInRealTime = true
@@ -358,6 +388,11 @@ struct ScreenRecorder {
         // Configure frame rate
         config.minimumFrameInterval = CMTime(value: 1, timescale: Int32(truncating: NSNumber(value: showCursor ? 60 : 30)))
         config.showsCursor = showCursor
+
+        // Configure queue depth for sample buffers
+        // Higher values prevent dropped samples under system load
+        // Apple default is typically 3-5, we use 8 for audio-sensitive recording
+        config.queueDepth = 8
 
         // Configure crop area if specified
         if let cropRect = cropRect {
@@ -462,11 +497,23 @@ struct ScreenRecorder {
         await assetWriter.finishWriting()
 
         // Log dropped samples summary
-        if streamOutput.droppedVideoFrameCount > 0 {
-            print("Dropped \(streamOutput.droppedVideoFrameCount) video frame(s) during recording")
+        if streamOutput.droppedVideoFrameCount > 0 || streamOutput.droppedAudioSampleCount > 0 {
+            print("⚠️  RECORDING QUALITY WARNING:")
+            if streamOutput.droppedVideoFrameCount > 0 {
+                print("   - Dropped \(streamOutput.droppedVideoFrameCount) video frame(s)")
+            }
+            if streamOutput.droppedAudioSampleCount > 0 {
+                print("   - Dropped \(streamOutput.droppedAudioSampleCount) audio sample(s) due to writer backpressure")
+                print("   Audio drops can cause stuttering/glitches in the recording.")
+                print("   Consider closing other applications to reduce system load.")
+            }
+        } else {
+            print("✓ Recording completed with no dropped samples")
         }
-        if streamOutput.droppedAudioSampleCount > 0 {
-            print("Dropped \(streamOutput.droppedAudioSampleCount) audio sample(s) during recording")
+
+        // Log early audio samples (informational, not a problem)
+        if streamOutput.earlyAudioSampleCount > 0 {
+            print("ℹ️  Discarded \(streamOutput.earlyAudioSampleCount) early audio sample(s) at recording start (expected)")
         }
     }
 
@@ -478,8 +525,9 @@ struct ScreenRecorder {
         var sessionStarted = false
         var firstSampleTime: CMTime = .zero
         var lastSampleBuffer: CMSampleBuffer?
-        var droppedAudioSampleCount = 0
+        var droppedAudioSampleCount = 0      // Dropped due to writer not ready (problematic)
         var droppedVideoFrameCount = 0
+        var earlyAudioSampleCount = 0        // Dropped due to arriving before first video (expected)
 
         init(videoInput: AVAssetWriterInput, 
              audioInput: AVAssetWriterInput? = nil, 
@@ -561,15 +609,18 @@ struct ScreenRecorder {
                 return
             }
 
-            // Wait briefly for the writer to become ready (up to 10ms)
+            // Wait for the writer to become ready (up to 100ms)
+            // 10ms was too short and caused dropped samples under system load
             var retryCount = 0
-            while !audioInput.isReadyForMoreMediaData && retryCount < 10 {
-                usleep(1000) // 1ms
+            while !audioInput.isReadyForMoreMediaData && retryCount < 100 {
+                usleep(1000) // 1ms per retry, 100 retries = 100ms max
                 retryCount += 1
             }
 
             guard audioInput.isReadyForMoreMediaData else {
                 droppedAudioSampleCount += 1
+                let sourceLabel = isFromMicrophone ? "microphone" : "system audio"
+                print("WARNING: Dropped \(sourceLabel) sample after \(retryCount)ms wait (writer not ready)")
                 return
             }
 
@@ -579,8 +630,9 @@ struct ScreenRecorder {
             // Discard audio samples with negative presentation times
             // This happens when the audio source (e.g., external microphone/audio interface)
             // has timestamps from before the first video frame was captured
+            // This is expected at recording start and not a quality issue
             if presentationTime < .zero {
-                droppedAudioSampleCount += 1
+                earlyAudioSampleCount += 1
                 return
             }
 
