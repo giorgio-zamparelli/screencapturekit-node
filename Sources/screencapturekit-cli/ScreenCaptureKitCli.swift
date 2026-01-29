@@ -202,6 +202,9 @@ struct ScreenRecorder {
         // Create AVAssetWriter for a QuickTime movie file
         assetWriter = try AVAssetWriter(url: url, fileType: .mov)
 
+        // Enable fast start (moov atom at beginning) for streaming/progressive download
+        assetWriter.shouldOptimizeForNetworkUse = true
+
         // MARK: AVAssetWriter setup
 
         // Get size and pixel scale factor for display
